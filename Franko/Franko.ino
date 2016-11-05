@@ -1,5 +1,5 @@
 #include <PID_v1.h>
-#include <LMotorController.h>
+#include <IBTMotorController.h>
 #include "I2Cdev.h"
 
 #include "MPU6050_6Axis_MotionApps20.h"
@@ -58,15 +58,12 @@ int moveState=0; //0 = balance; 1 = back; 2 = forth
 //MOTOR CONTROLLER
 
 
-int ENA = 3;
-int IN1 = 4;
-int IN2 = 8;
-int IN3 = 5;
-int IN4 = 7;
-int ENB = 6;
+int ENA = 10; //Motor PWM Forward Pin
+int ENA_1 = 11; //Motor PWM Reverse Pin
+int IN1 = 12; //Motor forward set pin
+int IN2 = 6; //Motor reverse set pin
 
-
-LMotorController motorController(ENA, IN1, IN2, ENB, IN3, IN4, 0.6, 1);
+IBTMotorController motorController(ENA, ENA_1 IN1, IN2, 0.6);
 
 
 //timers
@@ -135,12 +132,12 @@ void setup()
 
         // get expected DMP packet size for later comparison
         packetSize = mpu.dmpGetFIFOPacketSize();
-        
+
         //setup PID
-        
+
         pid.SetMode(AUTOMATIC);
         pid.SetSampleTime(10);
-        pid.SetOutputLimits(-255, 255);  
+        pid.SetOutputLimits(-255, 255);
     }
     else
     {
@@ -164,10 +161,10 @@ void loop()
     while (!mpuInterrupt && fifoCount < packetSize)
     {
         //no mpu data - performing PID calculations and output to motors
-        
+
         pid.Compute();
         motorController.move(output, MIN_ABS_SPEED);
-        
+
         unsigned long currentMillis = millis();
 
         if (currentMillis - time1Hz >= 1000)
@@ -175,7 +172,7 @@ void loop()
             loopAt1Hz();
             time1Hz = currentMillis;
         }
-        
+
         if (currentMillis - time5Hz >= 5000)
         {
             loopAt5Hz();
@@ -206,7 +203,7 @@ void loop()
 
         // read a packet from FIFO
         mpu.getFIFOBytes(fifoBuffer, packetSize);
-        
+
         // track FIFO count here in case there is > 1 packet available
         // (this lets us immediately read more without waiting for an interrupt)
         fifoCount -= packetSize;
@@ -250,7 +247,7 @@ void moveBackForth()
 {
     moveState++;
     if (moveState > 2) moveState = 0;
-    
+
     if (moveState == 0)
       setpoint = originalSetpoint;
     else if (moveState == 1)
@@ -266,7 +263,7 @@ void moveBackForth()
 void setPIDTuningValues()
 {
     readPIDTuningValues();
-    
+
     if (kp != prevKp || ki != prevKi || kd != prevKd)
     {
 #if LOG_PID_CONSTANTS
@@ -284,7 +281,7 @@ void readPIDTuningValues()
     int potKp = analogRead(A0);
     int potKi = analogRead(A1);
     int potKd = analogRead(A2);
-        
+
     kp = map(potKp, 0, 1023, 0, 25000) / 100.0; //0 - 250
     ki = map(potKi, 0, 1023, 0, 100000) / 100.0; //0 - 1000
     kd = map(potKd, 0, 1023, 0, 500) / 100.0; //0 - 5
