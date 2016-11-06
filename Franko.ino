@@ -1,6 +1,7 @@
+
 #include <PID_v1.h>
 #include <IBTMotorController.h>
-#include "I2Cdev.h"
+#include <I2Cdev.h>
 
 #include "MPU6050_6Axis_MotionApps20.h"
 
@@ -9,12 +10,15 @@
 #endif
 
 
-#define LOG_INPUT 0
+#define LOG_INPUT 1
 #define MANUAL_TUNING 0
 #define LOG_PID_CONSTANTS 0 //MANUAL_TUNING must be 1
 #define MOVE_BACK_FORTH 0
 
 #define MIN_ABS_SPEED 30
+#define MPU_INT 0/0
+#define LED_PIN 13
+bool blinkState = false;
 
 //MPU
 
@@ -58,12 +62,13 @@ int moveState=0; //0 = balance; 1 = back; 2 = forth
 //MOTOR CONTROLLER
 
 
-int ENA = 10; //Motor PWM Forward Pin
-int ENA_1 = 11; //Motor PWM Reverse Pin
-int IN1 = 12; //Motor forward set pin
-int IN2 = 6; //Motor reverse set pin
+int ENA = 10; //Motor A PWM PIN
+int ENA_1 = 11; //Motor A PWM Reverse Pin
+int IN1 = 12; //Motor A Forward PIN (high when forward, low when reversing)
+int IN2 = 6; //Motor A Reverse PIN (high when reversing, low when forward)
+double MOTOR_A_CONST = 0.6; //Minimum output
 
-IBTMotorController motorController(ENA, ENA_1 IN1, IN2, 0.6);
+IBTMotorController motorController(ENA, ENA_1, IN1, IN2, MOTOR_A_CONST);
 
 
 //timers
@@ -123,7 +128,7 @@ void setup()
 
         // enable Arduino interrupt detection
         Serial.println(F("Enabling interrupt detection (Arduino external interrupt 0)..."));
-        attachInterrupt(0, dmpDataReady, RISING);
+        attachInterrupt(MPU_INT, dmpDataReady, RISING);
         mpuIntStatus = mpu.getIntStatus();
 
         // set our DMP Ready flag so the main loop() function knows it's okay to use it
@@ -132,12 +137,12 @@ void setup()
 
         // get expected DMP packet size for later comparison
         packetSize = mpu.dmpGetFIFOPacketSize();
-
+        
         //setup PID
-
+        
         pid.SetMode(AUTOMATIC);
         pid.SetSampleTime(10);
-        pid.SetOutputLimits(-255, 255);
+        pid.SetOutputLimits(-255, 255);  
     }
     else
     {
@@ -149,6 +154,7 @@ void setup()
         Serial.print(devStatus);
         Serial.println(F(")"));
     }
+    pinMode(LED_PIN, OUTPUT);
 }
 
 
@@ -161,10 +167,10 @@ void loop()
     while (!mpuInterrupt && fifoCount < packetSize)
     {
         //no mpu data - performing PID calculations and output to motors
-
+        
         pid.Compute();
         motorController.move(output, MIN_ABS_SPEED);
-
+        
         unsigned long currentMillis = millis();
 
         if (currentMillis - time1Hz >= 1000)
@@ -172,11 +178,11 @@ void loop()
             loopAt1Hz();
             time1Hz = currentMillis;
         }
-
+        
         if (currentMillis - time5Hz >= 5000)
         {
             loopAt5Hz();
-            time5Hz = currentMillis;
+            time5Hz = currentMillis;            
         }
     }
 
@@ -203,7 +209,7 @@ void loop()
 
         // read a packet from FIFO
         mpu.getFIFOBytes(fifoBuffer, packetSize);
-
+        
         // track FIFO count here in case there is > 1 packet available
         // (this lets us immediately read more without waiting for an interrupt)
         fifoCount -= packetSize;
@@ -220,7 +226,12 @@ void loop()
             Serial.println(ypr[2] * 180/M_PI);
         #endif
         input = ypr[1] * 180/M_PI + 180;
-   }
+   } 
+   
+   blinkState = !blinkState;
+  
+   digitalWrite(LED_PIN, blinkState);
+    
 }
 
 
@@ -247,7 +258,7 @@ void moveBackForth()
 {
     moveState++;
     if (moveState > 2) moveState = 0;
-
+    
     if (moveState == 0)
       setpoint = originalSetpoint;
     else if (moveState == 1)
@@ -263,7 +274,7 @@ void moveBackForth()
 void setPIDTuningValues()
 {
     readPIDTuningValues();
-
+    
     if (kp != prevKp || ki != prevKi || kd != prevKd)
     {
 #if LOG_PID_CONSTANTS
@@ -281,7 +292,7 @@ void readPIDTuningValues()
     int potKp = analogRead(A0);
     int potKi = analogRead(A1);
     int potKd = analogRead(A2);
-
+        
     kp = map(potKp, 0, 1023, 0, 25000) / 100.0; //0 - 250
     ki = map(potKi, 0, 1023, 0, 100000) / 100.0; //0 - 1000
     kd = map(potKd, 0, 1023, 0, 500) / 100.0; //0 - 5
