@@ -15,6 +15,7 @@
 #define LOG_PID_CONSTANTS 0 //MANUAL_TUNING must be 1
 #define MOVE_BACK_FORTH 0
 
+#define MIN_ABS_SPEED 0
 #define MPU_INT 0 //0
 #define LED_PIN 13
 bool blinkState = false;
@@ -45,13 +46,16 @@ float ypr[3];           // [yaw, pitch, roll]   yaw/pitch/roll container and gra
   double kp , ki, kd;
   double prevKp, prevKi, prevKd;
 #endif
+double originalSetpoint = 0.0;
 double setpoint = originalSetpoint;
+double movingAngleOffset = 0.0;
 double input, output;
 int moveState=0; //0 = balance; 1 = back; 2 = forth
 
 #if MANUAL_TUNING
   PID pid(&input, &output, &setpoint, 0, 0, 0, DIRECT);
 #else
+  PID pid(&input, &output, &setpoint, 1, 10, 0.6, DIRECT);
 #endif
 
 
@@ -62,6 +66,7 @@ int ENA = 10; //Motor A PWM PIN
 int ENA_1 = 11; //Motor A PWM Reverse Pin
 int IN1 = 12; //Motor A Forward PIN (high when forward, low when reversing)
 int IN2 = 6; //Motor A Reverse PIN (high when reversing, low when forward)
+double MOTOR_A_CONST = 0.0; //Minimum output
 
 IBTMotorController motorController(ENA, ENA_1, IN1, IN2, MOTOR_A_CONST);
 
@@ -212,6 +217,7 @@ void loop()
         mpu.dmpGetQuaternion(&q, fifoBuffer);
         mpu.dmpGetGravity(&gravity, &q);
         mpu.dmpGetYawPitchRoll(ypr, &q, &gravity);
+        input = ypr[1] * 180/M_PI;
         #if LOG_INPUT
           logStatus();
         #endif
