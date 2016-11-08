@@ -15,8 +15,7 @@
 #define LOG_PID_CONSTANTS 0 //MANUAL_TUNING must be 1
 #define MOVE_BACK_FORTH 0
 
-#define MIN_ABS_SPEED 30
-#define MPU_INT 0/0
+#define MPU_INT 0 //0
 #define LED_PIN 13
 bool blinkState = false;
 
@@ -46,16 +45,13 @@ float ypr[3];           // [yaw, pitch, roll]   yaw/pitch/roll container and gra
   double kp , ki, kd;
   double prevKp, prevKi, prevKd;
 #endif
-double originalSetpoint = 174.29;
 double setpoint = originalSetpoint;
-double movingAngleOffset = 0.3;
 double input, output;
 int moveState=0; //0 = balance; 1 = back; 2 = forth
 
 #if MANUAL_TUNING
   PID pid(&input, &output, &setpoint, 0, 0, 0, DIRECT);
 #else
-  PID pid(&input, &output, &setpoint, 70, 240, 1.9, DIRECT);
 #endif
 
 
@@ -66,7 +62,6 @@ int ENA = 10; //Motor A PWM PIN
 int ENA_1 = 11; //Motor A PWM Reverse Pin
 int IN1 = 12; //Motor A Forward PIN (high when forward, low when reversing)
 int IN2 = 6; //Motor A Reverse PIN (high when reversing, low when forward)
-double MOTOR_A_CONST = 0.6; //Minimum output
 
 IBTMotorController motorController(ENA, ENA_1, IN1, IN2, MOTOR_A_CONST);
 
@@ -76,6 +71,7 @@ IBTMotorController motorController(ENA, ENA_1, IN1, IN2, MOTOR_A_CONST);
 
 long time1Hz = 0;
 long time5Hz = 0;
+long logStatusCount = 0;
 
 
 volatile bool mpuInterrupt = false;     // indicates whether MPU interrupt pin has gone high
@@ -114,10 +110,10 @@ void setup()
     devStatus = mpu.dmpInitialize();
 
     // supply your own gyro offsets here, scaled for min sensitivity
-    mpu.setXGyroOffset(220);
-    mpu.setYGyroOffset(76);
-    mpu.setZGyroOffset(-85);
-    mpu.setZAccelOffset(1788); // 1688 factory default for my test chip
+    mpu.setXGyroOffset(52);
+    mpu.setYGyroOffset(-9);
+    mpu.setZGyroOffset(-51);
+    mpu.setZAccelOffset(4645); // 1688 factory default for my test chip
 
     // make sure it worked (returns 0 if so)
     if (devStatus == 0)
@@ -199,11 +195,10 @@ void loop()
         // reset so we can continue cleanly
         mpu.resetFIFO();
         Serial.println(F("FIFO overflow!"));
-
     // otherwise, check for DMP data ready interrupt (this should happen frequently)
     }
     else if (mpuIntStatus & 0x02)
-    {
+    {        
         // wait for correct available data length, should be a VERY short wait
         while (fifoCount < packetSize) fifoCount = mpu.getFIFOCount();
 
@@ -218,28 +213,34 @@ void loop()
         mpu.dmpGetGravity(&gravity, &q);
         mpu.dmpGetYawPitchRoll(ypr, &q, &gravity);
         #if LOG_INPUT
-            Serial.print("ypr\t");
-            Serial.print(ypr[0] * 180/M_PI);
-            Serial.print("\t");
-            Serial.print(ypr[1] * 180/M_PI);
-            Serial.print("\t");
-            Serial.println(ypr[2] * 180/M_PI);
+          logStatus();
         #endif
-        input = ypr[1] * 180/M_PI + 180;
-   } 
-   
-   blinkState = !blinkState;
-  
-   digitalWrite(LED_PIN, blinkState);
-    
+    }
+}
+
+void logStatus()
+{
+  if(++logStatusCount >= 100)
+  {
+    logStatusCount = 0;
+    Serial.print("ypr\t");
+    Serial.print(ypr[0] * 180/M_PI);
+    Serial.print("\t");
+    Serial.print(ypr[1] * 180/M_PI);
+    Serial.print("\t");
+    Serial.println(ypr[2] * 180/M_PI);
+    Serial.print("Output to motor\t");
+    Serial.print(output);
+    Serial.print("\n");
+  }
 }
 
 
 void loopAt1Hz()
 {
-#if MANUAL_TUNING
-    setPIDTuningValues();
-#endif
+    #if MANUAL_TUNING
+        setPIDTuningValues();
+    #endif
 }
 
 
