@@ -115,10 +115,12 @@ void setup()
     devStatus = mpu.dmpInitialize();
 
     // supply your own gyro offsets here, scaled for min sensitivity
-    mpu.setXGyroOffset(52);
-    mpu.setYGyroOffset(-9);
-    mpu.setZGyroOffset(-51);
-    mpu.setZAccelOffset(4645); // 1688 factory default for my test chip
+//    mpu.setXGyroOffset(43);
+//    mpu.setYGyroOffset(6);
+//    mpu.setZGyroOffset(-50);
+//    mpu.setXAccelOffset(-3792);
+//    mpu.setYAccelOffset(-746);
+//    mpu.setZAccelOffset(4625); // 1688 factory default for my test chip
 
     // make sure it worked (returns 0 if so)
     if (devStatus == 0)
@@ -229,13 +231,13 @@ void logStatus()
   if(++logStatusCount >= 100)
   {
     logStatusCount = 0;
-    Serial.print("ypr\t");
+    Serial.print("ypro\t");
     Serial.print(ypr[0] * 180/M_PI);
     Serial.print("\t");
     Serial.print(ypr[1] * 180/M_PI);
     Serial.print("\t");
-    Serial.println(ypr[2] * 180/M_PI);
-    Serial.print("Output to motor\t");
+    Serial.print(ypr[2] * 180/M_PI);
+    Serial.print("\t");
     Serial.print(output);
     Serial.print("\n");
   }
